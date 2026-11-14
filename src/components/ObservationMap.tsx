@@ -2,9 +2,8 @@
 
 import { useEffect } from "react";
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from "react-leaflet";
-import L from "leaflet";
 
-type Props = { activeLayer: string; selected: string; onSelect: (id: string) => void; showEvents: boolean };
+type Props = { activeLayer: string; selected: string; onSelect: (id: string) => void };
 
 const points = [
   { id: "SAR-042", position: [22.2587, 71.1924] as [number, number], label: "Coastal morphology scan", color: "#6de6dc" },
