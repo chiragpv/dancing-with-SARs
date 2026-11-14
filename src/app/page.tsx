@@ -25,7 +25,6 @@ export default function Home() {
   const [range, setRange] = useState("30 days");
   const [search, setSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showEvents, setShowEvents] = useState(true);
   const filtered = useMemo(() => observations.filter(o => (o.name + o.place + o.type).toLowerCase().includes(search.toLowerCase())), [search]);
   const current = observations.find(o => o.id === selected) ?? observations[0];
 
@@ -61,7 +60,7 @@ export default function Home() {
             <div className="breadcrumb">Workspace <span>/</span> <b>Observation console</b></div>
           </div>
           <div className="topbar-actions">
-            <div className="live-pill"><span className="pulse"/> SYSTEM LIVE</div>
+            <div className="live-pill"><span className="pulse"/> DEMO MODE</div>
             <button className="icon-btn" aria-label="Notifications"><Bell size={17}/><i/></button>
             <div className="avatar small">DW</div>
           </div>
@@ -69,22 +68,22 @@ export default function Home() {
 
         <div className="content">
           <div className="page-heading">
-            <div><div className="eyebrow"><span/> SATELLITE INTELLIGENCE / OVERVIEW</div><h1>Observation <em>console</em></h1><p>Explore the surface. Detect the signal. Understand the change.</p></div>
+            <div><div className="eyebrow"><span/> SATELLITE INTELLIGENCE / UI PREVIEW</div><h1>Observation <em>console</em></h1><p>Explore the surface. Detect the signal. Understand the change.</p></div>
             <div className="heading-actions"><button className="secondary-btn"><CalendarDays size={15}/> Nov 01 — Nov 14, 2026 <ChevronDown size={14}/></button><button className="primary-btn"><Sparkles size={15}/> New analysis</button></div>
           </div>
 
           <div className="stats-grid">
-            <div className="stat-card"><div className="stat-top"><span>OBSERVATIONS</span><span className="stat-icon"><Satellite size={16}/></span></div><div className="stat-value">1,284 <small className="positive"><ArrowUpRight size={13}/> 12.6%</small></div><div className="stat-foot">Across all monitored regions</div><div className="sparkline"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></div></div>
-            <div className="stat-card"><div className="stat-top"><span>AREAS OF CHANGE</span><span className="stat-icon"><Activity size={16}/></span></div><div className="stat-value">36 <small className="positive"><ArrowUpRight size={13}/> 4.8%</small></div><div className="stat-foot">Detected in selected period</div><div className="mini-bars"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></div></div>
-            <div className="stat-card"><div className="stat-top"><span>DATA COVERAGE</span><span className="stat-icon"><Layers3 size={16}/></span></div><div className="stat-value">92.4<small>%</small></div><div className="stat-foot">Selected region coverage</div><div className="coverage-line"><span/></div></div>
-            <div className="stat-card"><div className="stat-top"><span>ACTIVE SENSORS</span><span className="stat-icon"><Radar size={16}/></span></div><div className="stat-value">04 <small className="muted-stat">/ 06</small></div><div className="stat-foot">SAR data sources connected</div><div className="sensor-dots"><i/><i/><i/><i/><i/><i/></div></div>
+            <div className="stat-card"><div className="stat-top"><span>DEMO OBSERVATIONS</span><span className="stat-icon"><Satellite size={16}/></span></div><div className="stat-value">1,284 <small className="positive"><ArrowUpRight size={13}/> 12.6%</small></div><div className="stat-foot">Across all monitored regions</div><div className="sparkline"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></div></div>
+            <div className="stat-card"><div className="stat-top"><span>SAMPLE CHANGE AREAS</span><span className="stat-icon"><Activity size={16}/></span></div><div className="stat-value">36 <small className="positive"><ArrowUpRight size={13}/> 4.8%</small></div><div className="stat-foot">Detected in selected period</div><div className="mini-bars"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></div></div>
+            <div className="stat-card"><div className="stat-top"><span>SAMPLE COVERAGE</span><span className="stat-icon"><Layers3 size={16}/></span></div><div className="stat-value">92.4<small>%</small></div><div className="stat-foot">Selected region coverage</div><div className="coverage-line"><span/></div></div>
+            <div className="stat-card"><div className="stat-top"><span>SENSOR UI PREVIEW</span><span className="stat-icon"><Radar size={16}/></span></div><div className="stat-value">04 <small className="muted-stat">/ 06</small></div><div className="stat-foot">SAR data sources connected</div><div className="sensor-dots"><i/><i/><i/><i/><i/><i/></div></div>
           </div>
 
           <div className="dashboard-grid">
             <section className="panel map-panel">
               <div className="panel-header"><div><div className="panel-kicker">GEOSPATIAL VIEW</div><h2>Surface intelligence</h2></div><div className="panel-tools"><button className="tool-btn"><SlidersHorizontal size={14}/> Controls</button><button className="icon-btn"><Download size={16}/></button><button className="icon-btn"><span>···</span></button></div></div>
               <div className="map-toolbar"><div className="layer-tabs">{["SAR intensity","Optical","Terrain"].map(layer => <button key={layer} onClick={() => setActiveLayer(layer)} className={activeLayer === layer ? "selected" : ""}>{layer}</button>)}</div><div className="map-meta"><span className="live-dot"/> {activeLayer.toUpperCase()} <span className="meta-sep">•</span> EPSG:4326</div></div>
-              <div className="map-wrap"><ObservationMap activeLayer={activeLayer} selected={selected} onSelect={setSelected} showEvents={showEvents}/><div className="map-coordinates"><Crosshair size={12}/> 22.2587° N, 71.1924° E</div><div className="map-legend"><span className="legend-title">INTENSITY</span><div className="legend-gradient"/><div className="legend-values"><span>LOW</span><span>HIGH</span></div></div><div className="map-float"><span className="pulse"/> LIVE MAP</div></div>
+              <div className="map-wrap"><ObservationMap activeLayer={activeLayer} selected={selected} onSelect={setSelected} /><div className="map-coordinates"><Crosshair size={12}/> 22.2587° N, 71.1924° E</div><div className="map-legend"><span className="legend-title">INTENSITY</span><div className="legend-gradient"/><div className="legend-values"><span>LOW</span><span>HIGH</span></div></div><div className="map-float"><span className="pulse"/> MAP READY</div></div>
               <div className="map-footer"><span><MapPin size={13}/> {current.place}</span><span>Zoom level 6.5</span><span>Tiles © OpenStreetMap</span></div>
             </section>
 
@@ -111,7 +110,7 @@ export default function Home() {
                 <button className={activeLayer === "Optical" ? "layer-row layer-active" : "layer-row"} onClick={() => setActiveLayer("Optical")}><span className="layer-swatch optical-swatch"/><span><b>Optical imagery</b><small>True colour composite</small></span><span className={activeLayer === "Optical" ? "toggle on" : "toggle"}/></button>
                 <button className={activeLayer === "Terrain" ? "layer-row layer-active" : "layer-row"} onClick={() => setActiveLayer("Terrain")}><span className="layer-swatch terrain-swatch"/><span><b>Terrain model</b><small>Elevation &amp; contours</small></span><span className={activeLayer === "Terrain" ? "toggle on" : "toggle"}/></button>
               </div>
-              <div className="layer-note"><Sparkles size={14}/><span>Layer controls are ready for connection to your SAR data service.</span></div>
+              <div className="layer-note"><Sparkles size={14}/><span>Sample dashboard values only. Connect your SAR API to display real observations and backscatter layers.</span></div>
             </section>
           </div>
           <footer className="footer"><span>© 2026 DANCING WITH THE SARs</span><span>GEOSPATIAL INTELLIGENCE WORKSPACE <i/> BUILD 0.1.0</span></footer>
