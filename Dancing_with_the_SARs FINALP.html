@@ -17,7 +17,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:400 14
 #c{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
 .top,.tools,.ill{position:absolute;z-index:2;pointer-events:none}
 .top{left:var(--s4);top:var(--s4);right:var(--s4);display:flex;flex-wrap:wrap;gap:var(--s2) var(--s4);align-items:baseline}
-.top button{pointer-events:auto;min-height:32px;font-size:12px;align-self:center}.top b{font-size:16px;letter-spacing:-.01em}.top span{color:var(--mute);font-size:12px}#apiStatus[data-state="ok"]{color:var(--ok)}#apiStatus[data-state="warning"]{color:var(--warn)}#apiStatus[data-state="error"]{color:var(--bad)}
+.top button{pointer-events:auto;min-height:32px;font-size:12px;align-self:center}.top b{font-size:16px;letter-spacing:-.01em}.top span{color:var(--mute);font-size:12px}
 .tools{right:var(--s4);bottom:var(--s4);display:flex;gap:var(--s2);pointer-events:auto}
 .ill{left:var(--s4);bottom:var(--s4);font-size:11px;color:var(--mute);max-width:55%}
 .lg{position:absolute;z-index:2;left:var(--s4);bottom:var(--s4);width:min(290px,calc(100% - 32px));max-height:min(50%,420px);overflow:auto;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(12,12,18,.72);backdrop-filter:blur(12px);font-size:12px}
@@ -125,11 +125,11 @@ dt{color:var(--mute)}dd{margin:0;text-align:right;font-variant-numeric:tabular-n
 <body>
 <a class="skip" href="#panel">Skip to controls</a>
 <div id="launch" role="dialog" aria-modal="true" aria-labelledby="launchT"><div class="box"><p class="eyebrow">NISAR · L + S band radar</p><h1 id="launchT">Dancing with the SARs</h1><p class="lede">Watch the Earth’s surface change from orbit. Pick a site, tune the radar, and see how rain, shift, heat and load move the signal.</p><ul class="chips"><li>L-band 24 cm</li><li>S-band 9.4 cm</li><li>12-day repeat</li><li>Interactive 3D globe</li></ul><p class="sub">Pick a site to fly to</p><div class="missions" id="missions"></div><button id="go" type="button">Launch simulator →</button><p class="hint">Drag the globe behind · Scroll to zoom · Press Enter to launch</p></div></div>
-<div id="rec" hidden><div class="card" role="dialog" aria-modal="true" aria-labelledby="recT"><div class="bar"><h2 id="recT">Past records, 2021 to 2026</h2><span id="recFilters" class="row"></span><button id="recClose" type="button">Close</button></div><div class="scroll" id="recBody"></div><p class="small" id="recFoot">Historical workbook fields and source notes; values are regional/contextual records, not pixel-level SAR measurements. Source/default distinctions are shown in each note.</p></div></div>
+<div id="rec" hidden><div class="card" role="dialog" aria-modal="true" aria-labelledby="recT"><div class="bar"><h2 id="recT">Past records, 2021 to 2026</h2><span id="recFilters" class="row"></span><button id="recClose" type="button">Close</button></div><div class="scroll" id="recBody"></div><p class="small" id="recFoot">Real figures from public agency reports, journals and news coverage. Most are regional (Assam state, Legal Amazon, Ladakh UT), not pixel values at the pin. Partial-season counts are marked in the note.</p></div></div>
 <div id="app">
  <main id="stage">
   <canvas id="c" aria-label="Interactive 3D globe. Drag to rotate, scroll to zoom. Use the site list to select a site."></canvas>
-  <header class="top"><button id="back" type="button" aria-label="Back to landing page">← Landing</button><b>NISAR // Dancing with the SARs</b><span>L-band 24 cm · S-band 9.4 cm · 12-day repeat</span><span id="apiStatus" data-state="loading" role="status" aria-live="polite" title="Connecting to the FastAPI backend">Connecting to API…</span></header>
+  <header class="top"><button id="back" type="button" aria-label="Back to landing page">← Landing</button><b>NISAR // Dancing with the SARs</b><span>L-band 24 cm · S-band 9.4 cm · 12-day repeat</span></header>
   <div id="yearBadge" hidden aria-live="polite"></div>
   <div id="legend" class="lg" role="region" aria-label="Map legend"><button id="lgBtn" type="button" aria-expanded="true">Legend ▾</button><div id="lgBody"></div></div>
   <div class="tools"><button id="pause" type="button" aria-label="Pause spin"><span class="ic">⏸</span><span class="lbl">Pause spin</span></button><button id="reset" type="button" aria-label="Reset view"><span class="ic">⟲</span><span class="lbl">Reset view</span></button><button id="snd" type="button" aria-pressed="true" title="Toggle sound (M)" aria-label="Sound on"><span class="ic">🔊</span><span class="lbl">Sound on</span></button><button id="recBtn" type="button" hidden aria-label="Past records"><span class="ic">📜</span><span class="lbl">Past records</span></button></div>
@@ -188,20 +188,6 @@ import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
  area=Amax*I^1.3 */
 const setBtn=(b,ic,l)=>{b.querySelector('.ic').textContent=ic;b.querySelector('.lbl').textContent=l;b.setAttribute('aria-label',l)};
 const $=s=>document.querySelector(s), clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
-const API_BASE=(window.SARS_API_BASE||new URLSearchParams(location.search).get('api')||'http://127.0.0.1:8000').replace(/\/+$/,'');
-const apiStatusEl=$('#apiStatus');
-let apiReady=false,apiError=null,apiSimulation=null,apiSimulationKey=null,simulationTimer=null,simulationRequestId=0;
-function setApiStatus(text,state,detail=''){apiStatusEl.textContent=text;apiStatusEl.dataset.state=state;apiStatusEl.title=detail||text;}
-async function apiFetch(path,options={}){
- const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
- try{
-  const response=await fetch(API_BASE+path,{...options,signal:controller.signal,headers:{...(options.headers||{}),...(options.body?{'Content-Type':'application/json'}:{})}});
-  const body=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(body.detail||'Request failed with HTTP '+response.status);
-  return body;
- }catch(error){if(error.name==='AbortError')throw new Error('The API request timed out.');throw error;}
- finally{clearTimeout(timeout);}
-}
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const R=1.72;
 const SITES={
@@ -222,16 +208,15 @@ function passRec(){return PASSDB&&PASSDB[state.site+'-'+state.year]}
 const fmtA=a=>a==null?'—':a===0?'0 km²':a<1?(+a).toFixed(3)+' km²':Math.round(a).toLocaleString()+' km²';
 function recArea(){const r=state.mode==='pass'&&passRec();return r&&typeof r.area==='number'?r:null}
 function siteMaxArea(k){let m=0;if(PASSDB)for(const y of YEARS){const r=PASSDB[k+'-'+y];if(r&&typeof r.area==='number')m=Math.max(m,r.area)}return m}
-function applyPass(){Object.assign(state,PASS[state.site]);const r=passRec();if(r)for(const k of IN)if(Number.isFinite(r[k]))state[k]=clamp(r[k],...RANGES[k]);}
+function applyPass(){Object.assign(state,PASS[state.site]);const r=passRec();if(r)for(const k of IN)if((r.from||[]).includes(k)&&isFinite(+r[k]))state[k]=clamp(+r[k],...RANGES[k]);}
 function setState(p){
- const before=simulationKey();
  for(const k in p){let v=p[k];
   if(k in RANGES){v=+v;if(!isFinite(v)||(state.mode==='pass'&&!('mode' in p)))continue;state[k]=clamp(v,...RANGES[k]);}
   else if(k==='year'){v=+v;if(YEARS.includes(v))state.year=v;}
   else if(k in ENUMS){if(ENUMS[k].includes(v))state[k]=v;}
   else if(typeof state[k]==='boolean')state[k]=!!v;}
  if(state.mode==='pass'&&('mode' in p||'site' in p||'year' in p))applyPass();
- dirty=true;if(apiReady&&simulationKey()!==before)requestSimulation();}
+ dirty=true;}
 
 /* ---------- simulation ---------- */
 function sim(s,site,band,pol){
@@ -244,7 +229,11 @@ function sim(s,site,band,pol){
  let decay=2.2*(1.2*g*W[1]+.8*r*W[0]+.9*t*W[2]+.6*v*W[3])/sum;
  if(site==='amazon'&&band==='S')decay*=1.3;
  const coh=clamp(.95*Math.exp(-decay),.05,.95),area=S.A*Math.pow(I,1.3),B=Math.round(100*(1-I));
- return {I,B,fringes,coh,area,sig:null,t};}
+ const co=pol==='HH'||pol==='VV';let sig;
+ if(site==='brahmaputra')sig=(co?-9:-17)*(1-I)-22*I;
+ else if(site==='ladakh')sig=(co?-9:-15)-4*Math.min(1,t);
+ else sig=(co?-8:(band==='L'?-12:-15)-3*t)-(site==='amazon'?2*I:0);
+ return {I,B,fringes,coh,area,sig,t};}
 const LABEL=B=>B>=70?['✔ BALANCED','#36d67e']:B>=40?['▲ STRESSED','#f59e0b']:['✖ CRITICAL','#ef4444'];
 function split(I){const f=c=>Math.exp(-Math.pow((I-c)/.25,2)),w=[f(.15),f(.5),f(.85)],t=w[0]+w[1]+w[2],raw=w.map(z=>z/t*100),out=raw.map(Math.floor);
  let rem=100-out[0]-out[1]-out[2];raw.map((z,i)=>[z-out[i],i]).sort((a,b)=>b[0]-a[0]).forEach(([,i])=>{if(rem>0){out[i]++;rem--}});return out;}
@@ -443,7 +432,7 @@ new ResizeObserver(()=>{const w=stage.clientWidth,h=stage.clientHeight;if(!w||!h
 /* ---------- UI ---------- */
 const BAND_NOTE={L:'L-band · 24 cm · penetrates canopy, tracks ground motion',S:'S-band · 9.4 cm · surface detail and vegetation structure'};
 const POL_NOTE={HH:'HH · co-pol · strong from bare surfaces and water edges',VV:'VV · co-pol · sensitive to surface roughness',HV:'HV · cross-pol · volume scattering from canopy',VH:'VH · cross-pol · reciprocal with HV, so near-identical'};
-const MODE_NOTE={whatif:'What-if balance sim: all inputs editable.',pass:'Illustrative pass configuration — not real NISAR data. Inputs are locked.',passDb:'Workbook inputs applied; outputs are illustrative, not SAR measurements. See Past records for source/default notes.'};
+const MODE_NOTE={whatif:'What-if balance sim: all inputs editable.',pass:'Illustrative pass configuration — not real NISAR data. Inputs are locked.',passDb:'Inputs set from that year’s records.'};
 function seg(id,key,vals,labels,fn){const host=$('#'+id);vals.forEach((v,i)=>{const b=document.createElement('button');b.type='button';b.textContent=labels[i];b.dataset.k=key;b.dataset.v=v;b.onclick=()=>fn?fn(v):setState({[key]:v});host.append(b)});}
 seg('sites','site',Object.keys(SITES),Object.values(SITES).map(s=>s.n),selectSite);
 seg('mode','mode',['whatif','pass'],['What-if balance sim','Illustrative NISAR pass'],v=>{if(typeof stopPlay==='function')stopPlay();setState({mode:v})});
@@ -458,7 +447,7 @@ PRESETS.forEach(([n,p])=>{const b=document.createElement('button');b.type='butto
 $('#sarO').onchange=e=>setState({sarOverlay:e.target.checked});$('#phO').onchange=e=>setState({phaseOverlay:e.target.checked});
 const MSK=['Site','Coordinates','Scenario','Mode','Band','Polarisation','Rainfall','Shift','Thermal','Load','Area','Balance index'];
 $('#ms').innerHTML=MSK.map((k,i)=>`<dt>${k}</dt><dd id="m${i}"></dd>`).join('');
-const IMK=['Condition','Change intensity','Disturbance level','Configuration','InSAR fringes','Coherence','Backscatter (dB)'];
+const IMK=['Condition','Change intensity','Disturbance level','Configuration','InSAR fringes','Coherence','Mean σ⁰ (dB)'];
 $('#imp').innerHTML=IMK.map((k,i)=>`<dt>${k}</dt><dd id="i${i}"></dd>`).join('');
 addEventListener('pointermove',e=>{const p=$('#panel').getBoundingClientRect();$('#panel').style.setProperty('--mx',(e.clientX-p.left)+'px');$('#panel').style.setProperty('--my',(e.clientY-p.top)+'px');});
 
@@ -477,27 +466,7 @@ function drawPass(){const c=pcx;c.clearRect(0,0,320,110);const a=[];
  c.textAlign='left';c.fillStyle='#a9afc2';c.fillText(Math.round(mx)+' km²',0,10);c.textAlign='right';c.fillText('coh '+Math.round(a[5].coh*100)+'%',320,10);}
 
 let res;
-function simulationKey(){return JSON.stringify([state.site,state.mode,state.band,state.pol,state.rain,state.shift,state.thermal,state.load]);}
-function requestSimulation(){
- const key=simulationKey();clearTimeout(simulationTimer);const requestId=++simulationRequestId;
- setApiStatus('API connected · calculating…','loading','Fetching simulation output from the FastAPI backend');
- simulationTimer=setTimeout(async()=>{
-  try{
-   const result=await apiFetch('/api/simulate',{method:'POST',body:JSON.stringify({site:state.site,mode:state.mode,band:state.band,polarisation:state.pol,rainfall:state.rain,ground_shift:state.shift,thermal_stress:state.thermal,surface_load:state.load})});
-   if(requestId!==simulationRequestId)return;
-   apiSimulation=result;apiSimulationKey=key;setApiStatus(apiStatusText,apiStatusState,apiStatusDetail);dirty=true;
-  }catch(error){
-   if(requestId!==simulationRequestId)return;
-   apiSimulation=null;apiSimulationKey=null;setApiStatus('API simulation unavailable','error',error.message);dirty=true;
-  }
- },120);
-}
-let apiStatusText='Connecting to API…',apiStatusState='loading',apiStatusDetail='Connecting to the FastAPI backend';
-function updateApiStatus(text,state,detail=''){apiStatusText=text;apiStatusState=state;apiStatusDetail=detail;setApiStatus(text,state,detail);}
-function calculateSimulation(){
- res=sim(state,state.site,state.band,state.pol);
- if(apiSimulation&&apiSimulationKey===simulationKey())res={I:apiSimulation.disturbance_level,B:apiSimulation.balance_index,fringes:apiSimulation.fringe_count,coh:apiSimulation.coherence,area:apiSimulation.estimated_affected_area_km2,sig:apiSimulation.estimated_backscatter_db,t:state.thermal,backscatter_unavailable_reason:apiSimulation.backscatter_unavailable_reason};
-}
+function calculateSimulation(){res=sim(state,state.site,state.band,state.pol);}
 const sd=new THREE.Vector3(0,0,1);let RT=.1;
 function updateEarthVisuals(){const S=SITES[state.site];
  U.uSite.value=S.id;U.uI.value=res.I;{const ra=recArea(),mx=ra?siteMaxArea(state.site):0;RT=ra&&mx>0?.06+.26*Math.sqrt(ra.area/mx):.07+.25*res.I;if(RM)U.uR.value=RT;}U.uFr.value=res.fringes;U.uCoh.value=res.coh;
@@ -516,8 +485,8 @@ function updateTelemetry(){const S=SITES[state.site],[lab,col]=LABEL(res.B);if(t
  for(const k in sliders){const pf=showY&&pr&&(pr.from||[]).includes(k);sliders[k].out.style.fontWeight=pf?'600':'';sliders[k].out.title=pf?'Set from record':'';}$('#bandNote').textContent=BAND_NOTE[state.band];$('#polNote').textContent=POL_NOTE[state.pol];
  setBtn($('#pause'),state.spinPaused?'▶':'⏸',state.spinPaused?'Resume spin':'Pause spin');
  const lvl=res.I<.33?'Low':res.I<.66?'Moderate':'High',cfg=`${state.mode==='pass'?'Pass':'What-if'} · ${state.band} · ${state.pol}`;
- const iv=[lab,Math.round(res.I*100)+'%',lvl,cfg,res.fringes.toFixed(2),Math.round(res.coh*100)+'%',res.sig==null?'Unavailable':res.sig.toFixed(1)];
- iv.forEach((v,i)=>$('#i'+i).textContent=v);$('#i6').title=res.backscatter_unavailable_reason||'No measured backscatter value is available from the backend.';
+ const iv=[lab,Math.round(res.I*100)+'%',lvl,cfg,res.fringes.toFixed(2),Math.round(res.coh*100)+'%',res.sig.toFixed(1)];
+ iv.forEach((v,i)=>$('#i'+i).textContent=v);
  const mv=[S.n,`${S.lat}°, ${S.lon}°`,S.tag,state.mode==='pass'?(PASSDB?'Record pass '+state.year:'Illustrative pass'):'What-if',state.band+'-band',state.pol,state.rain+' mm',state.shift+' cm',state.thermal+' °C',state.load+'%',(recArea()?fmtA(recArea().area)+' (recorded: '+recArea().areaLabel+')':Math.round(res.area).toLocaleString()+' km² (modelled)'),res.B+' · '+lab];
  mv.forEach((v,i)=>$('#m'+i).textContent=v);
  drawPass();
@@ -711,92 +680,21 @@ $('#go').addEventListener('click',()=>{const was=launchEl.classList.contains('ou
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&!launchEl.classList.contains('out')&&e.target.tagName!=='BUTTON')closeL()});
 document.addEventListener('pointermove',e=>{if(launchEl.classList.contains('out'))return;const r=lbox.getBoundingClientRect(),x=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),y=Math.min(1,Math.max(0,(e.clientY-r.top)/r.height));lbox.style.setProperty('--mx',x*100+'%');lbox.style.setProperty('--my',y*100+'%');lbox.style.setProperty('--rx',((.5-y)*6).toFixed(2)+'deg');lbox.style.setProperty('--ry',((x-.5)*8).toFixed(2)+'deg')});$('#go').focus();
 
-const recButton=$('#recBtn'),recDialog=$('#rec'),recBody=$('#recBody'),recFilters=$('#recFilters');
-let recordRows=[],recordSites=[],datasetMessage='Loading historical records…';
-recButton.hidden=false;
-const escapeHtml=value=>String(value==null?'':value).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const normalizeSite=value=>String(value||'').trim().toLowerCase().replace(/[^a-z0-9]/g,'');
-const finiteValue=value=>value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value))?Number(value):null;
-function mapObservation(record){
- const metadata=record.metadata||{},site=normalizeSite(record.site);
- const values=[
-  record.rainfall!=null?'Rainfall: '+record.rainfall+' mm':null,
-  finiteValue(metadata.shift_cm)!=null?'Shift: '+metadata.shift_cm+' cm':null,
-  finiteValue(metadata.thermal_c)!=null?'Thermal: '+metadata.thermal_c+' °C':null,
-  finiteValue(metadata.load_percent)!=null?'Load: '+metadata.load_percent+'%':null
- ].filter(Boolean);
- const provenance=metadata.from_records?String(metadata.from_records):'Source/default attribution not specified';
- const note=[provenance,metadata.note].filter(Boolean).join(' · ');
- return {id:record.id,site,year:record.year,hazard:'Workbook pass inputs',metric:'Rainfall · shift · thermal · load',value:values.join(' · ')||'No numeric values available',note,source:[record.source_file,record.source_sheet].filter(Boolean).join(' · ')||'Historical workbook'};
-}
-function mapPass(record){
- const metadata=record.metadata||{},site=normalizeSite(record.site),source=String(metadata.from_records||'').toLowerCase();
- const values={rain:finiteValue(record.rainfall),shift:finiteValue(metadata.shift_cm),thermal:finiteValue(metadata.thermal_c),load:finiteValue(metadata.load_percent)};
- const from=[];
- if(source.includes('rainfall'))from.push('rain');
- if(source.includes('shift'))from.push('shift');
- if(source.includes('thermal'))from.push('thermal');
- if(source.includes('load'))from.push('load');
- return {site,year:record.year,...values,from,note:metadata.note,source:metadata.from_records};
-}
-function drawRecords(site='all'){
- recFilters.innerHTML='';
- ['all',...recordSites].forEach(key=>{
-  const button=document.createElement('button');button.type='button';
-  const count=recordRows.filter(row=>key==='all'||row.site===key).length;
-  button.textContent=(key==='all'?'All sites':(SITES[key]||{}).n||key)+' ('+count+')';
-  button.setAttribute('aria-pressed',String(key===site));button.onclick=()=>drawRecords(key);recFilters.append(button);
- });
- const filtered=recordRows.filter(row=>site==='all'||row.site===site).sort((a,b)=>(+b.year||0)-(+a.year||0)||String(a.site).localeCompare(b.site));
- recBody.innerHTML=filtered.length
-  ?'<table><thead><tr><th>Year / period</th><th>Site</th><th>Record type</th><th>Fields</th><th>Workbook values</th><th>Source</th></tr></thead><tbody>'+filtered.map(row=>'<tr><td>'+escapeHtml(row.year)+'</td><td>'+escapeHtml((SITES[row.site]||{}).n||row.site)+'</td><td>'+escapeHtml(row.hazard)+'</td><td>'+escapeHtml(row.metric)+'</td><td>'+escapeHtml(row.value)+(row.note?'<small class="rn">'+escapeHtml(row.note)+'</small>':'')+'</td><td>'+escapeHtml(row.source)+'</td></tr>').join('')+'</tbody></table>'
-  :'<p class="msg">'+escapeHtml(datasetMessage)+'</p>';
-}
-const closeRecords=()=>{recDialog.hidden=true};
-$('#recClose').onclick=closeRecords;recDialog.addEventListener('click',event=>{if(event.target===recDialog)closeRecords()});
-document.addEventListener('keydown',event=>{if(event.key==='Escape')closeRecords()});
-recButton.onclick=()=>{recDialog.hidden=false;drawRecords();};
-function addPassControls(){
- const years=[...new Set(Object.values(PASSDB).map(record=>record.year))].filter(Number.isFinite).sort((a,b)=>a-b);
- if(!years.length)return;
- YEARS.splice(0,YEARS.length,...years);
- years.forEach(year=>{const button=document.createElement('button');button.type='button';button.className='yb';button.textContent=year;button.dataset.k='year';button.dataset.v=String(year);button.onclick=()=>{stopPlay();setState({mode:'pass',year})};$('#years').append(button)});
- const play=document.createElement('button');play.type='button';play.id='playY';play.textContent='▶ Play';play.title='Step through the available workbook years';play.setAttribute('aria-pressed','false');play.onclick=()=>PLAY.timer?stopPlay():startPlay();$('#years').prepend(play);
- if(state.mode==='pass')applyPass();dirty=true;
-}
-async function initializeApi(){
- updateApiStatus('Connecting to API…','loading','Connecting to the FastAPI backend at '+API_BASE);
- try{
-  const [health,apiSites,dataset,summary,filters]=await Promise.all([
-   apiFetch('/health'),apiFetch('/api/sites'),apiFetch('/api/observations'),apiFetch('/api/observations/summary'),apiFetch('/api/observations/filters')
-  ]);
-  if(health.status!=='ok'&&health.status!=='degraded')throw new Error('The API health check returned an unexpected status.');
-  apiSites.forEach(site=>{
-   const key=normalizeSite(site.key||site.name),current=SITES[key];
-   if(current){current.n=site.name;current.lat=site.latitude;current.lon=site.longitude;}
-  });
-  const observations=Array.isArray(dataset.observations)?dataset.observations:[];
-  datasetMessage=dataset.message||'The historical workbook is not available.';
-  recordRows=observations.map(mapObservation);
-  recordSites=(Array.isArray(filters.sites)?filters.sites:[]).map(normalizeSite).filter(Boolean);
-  if(dataset.dataset_status==='loaded'&&observations.length){
-   PASSDB={};
-   observations.map(mapPass).forEach(record=>{if(record.site&&Number.isFinite(record.year))PASSDB[record.site+'-'+record.year]=record});
-   addPassControls();datasetMessage='No historical records are available.';
-  }else{
-   PASSDB=null;datasetMessage=dataset.message||'The historical workbook is not loaded.';
-  }
-  apiReady=true;
-  if(dataset.dataset_status==='loaded')updateApiStatus('API connected · '+summary.record_count+' records','ok',dataset.message);
-  else updateApiStatus('API connected · workbook unavailable','warning',dataset.message);
-  requestSimulation();dirty=true;
- }catch(error){
-  updateApiStatus('API unavailable','error',error.message);
-  datasetMessage='Could not load historical records: '+error.message;
-  dirty=true;
- }
-}
-initializeApi();
+(async()=>{let db=null,RO=false;try{db=await claude.use('db')}catch(e){}
+ // offline copy: read-only snapshot of the records built into the file
+ if(!db&&window.SARS_SNAPSHOT){const S=window.SARS_SNAPSHOT,wrap=a=>({docs:a.map((d,i)=>({id:String(i),data:()=>d}))});RO=true;
+  db={collection:n=>({get:async()=>wrap(n==='passes'?S.passes:n==='events'?S.records:[]),doc:()=>({set:async()=>{throw new Error('read-only copy')},delete:async()=>{throw new Error('read-only copy')}})})};}
+ if(!db)return;
+ if(RO){$('#recList').innerHTML='<p class="small">Saving recordings needs the online version of this page.</p>';}
+ else{DB=db;try{USER=await claude.use('user');if(USER&&USER.id)UID=await USER.id()}catch(e){}$('#feedRec').disabled=!FEED.on;loadRecs();}
+try{const q=await Promise.race([db.collection('passes').get(),new Promise((_,r)=>setTimeout(()=>r(0),10000))]);const m={};q.docs.forEach(d=>{const x=d.data();if(x&&x.site&&x.year)m[x.site+'-'+x.year]=x});if(Object.keys(m).length){PASSDB=m;YEARS.forEach(y=>{const b=document.createElement('button');b.type='button';b.className='yb';b.textContent=y;b.dataset.k='year';b.dataset.v=String(y);b.onclick=()=>{stopPlay();setState({mode:'pass',year:y})};$('#years').append(b)});const pb=document.createElement('button');pb.type='button';pb.id='playY';pb.textContent='▶ Play';pb.title='Step through 2021 to 2026';pb.setAttribute('aria-pressed','false');pb.onclick=()=>PLAY.timer?stopPlay():startPlay();$('#years').prepend(pb);if(state.mode==='pass')applyPass();dirty=true;}}catch(e){}
+const btn=$('#recBtn'),rec=$('#rec'),body=$('#recBody'),fl=$('#recFilters');let rows=[],site='all';btn.hidden=false;
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const draw=()=>{fl.innerHTML='';['all',...Object.keys(SITES)].forEach(k=>{const b=document.createElement('button');b.type='button';const n=rows.filter(x=>k==='all'||x.site===k).length;b.textContent=(k==='all'?'All sites':SITES[k].n)+' ('+n+')';b.setAttribute('aria-pressed',String(k===site));b.onclick=()=>{site=k;draw()};fl.append(b)});
+const r=rows.filter(x=>site==='all'||x.site===site).sort((a,b)=>(+b.year||0)-(+a.year||0)||String(a.site).localeCompare(b.site));
+body.innerHTML=r.length?'<table><thead><tr><th>Year / period</th><th>Site</th><th>Hazard</th><th>Metric</th><th>Value</th><th>Source</th></tr></thead><tbody>'+r.map(x=>'<tr><td>'+esc(x.year||x.period)+'</td><td>'+esc((SITES[x.site]||{}).n||x.site)+'</td><td>'+esc(x.hazard)+'</td><td>'+esc(x.metric)+'</td><td>'+esc(x.value)+(x.note?'<small class="rn">'+esc(x.note)+'</small>':'')+'</td><td>'+(/^https?:\/\//.test(x.sourceUrl||'')?'<a href="'+esc(x.sourceUrl)+'" target="_blank" rel="noopener">'+esc(x.source)+'</a>':esc(x.source))+'</td></tr>').join('')+'</tbody></table>':'<p class="msg">No records yet.</p>'};
+const close=()=>{rec.hidden=true};$('#recClose').onclick=close;rec.addEventListener('click',e=>{if(e.target===rec)close()});document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+btn.onclick=async()=>{rec.hidden=false;body.innerHTML='<p class="msg">Loading records...</p>';try{const to=new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),10000));const [a,b]=await Promise.race([Promise.all([db.collection('events').get(),db.collection('observations').get()]),to]);rows=[...a.docs,...b.docs].map(d=>Object.assign({id:d.id},d.data()))}catch(e){body.innerHTML='<p class="msg">Could not load records.</p>';return}draw()}})();
 </script>
 </body>
 </html>
