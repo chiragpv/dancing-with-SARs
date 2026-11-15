@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     log_level: Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"] = "INFO"
     cors_origins: list[str] = Field(default_factory=list)
+    sar_dataset_path: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

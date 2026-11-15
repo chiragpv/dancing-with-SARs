@@ -18,7 +18,7 @@ From this directory:
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements-dev.txt
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 uvicorn app.main:app --reload
 ```
 
@@ -54,7 +54,7 @@ No external dependencies are configured yet, so the dependency health map is emp
 
 ### `GET /api/observations`
 
-Returns any workbook-backed historical SAR records when the Excel dataset is available. If no workbook is present, the endpoint returns a structured empty result with `dataset_status` set to `missing` or `unavailable` instead of fabricating observations.
+Returns workbook-backed annual site/year input records when the Excel dataset is available. The supplied `Passes` sheet has 24 rows (four sites × six years), with rainfall, shift, thermal, load, provenance, and notes; the `Formulas` sheet documents input mappings/defaults. This is not a set of raw SAR acquisitions. It has no acquisition dates, satellite/sensor metadata, band/polarisation, measured backscatter/coherence, coordinates, or imagery. If no workbook is present, the endpoint returns a structured empty result with `dataset_status` set to `missing` or `unavailable` instead of fabricating observations.
 
 The simulator uses these workbook endpoints:
 
@@ -141,7 +141,7 @@ The co-polarized (`HH`, `VV`) and cross-polarized (`HV`, `VH`) backscatter paths
 | `area` | `estimated_affected_area_km2` |
 | `sig` | `estimated_backscatter_db` (currently `null`; original equation unavailable) |
 
-The static simulator's current dashboard values use this response. Backscatter is displayed as unavailable. The Next.js demo does not use this simulator contract.
+The static simulator uses this response for current illustrative telemetry. Its multi-step scenario chart and optional simulation feed are local illustrative calculations, not incoming satellite data. Backscatter is displayed as unavailable. The Next.js demo does not use this simulator contract.
 
 The static frontend also calls `GET /health` and `GET /api/sites` during startup. The site's displayed coordinates and names come from the API.
 

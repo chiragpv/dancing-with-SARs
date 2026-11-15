@@ -3,12 +3,13 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
 
+from app.config import get_settings
 from app.models.observation import ObservationRecord
 
 DATASET_FILENAME = "SARs record-based passes 2021–2026.xlsx"
@@ -37,6 +38,13 @@ def _normalize_scalar(value: Any) -> Any:
         cleaned = value.strip()
         return cleaned or None
     return value
+
+
+def _first_present(*values: Any) -> Any:
+    for value in values:
+        if value is not None and not (isinstance(value, str) and not value.strip()):
+            return value
+    return None
 
 
 def _as_float(value: Any) -> float | None:
@@ -73,6 +81,8 @@ def _parse_date(value: Any) -> str | None:
         return None
     if isinstance(value, datetime):
         return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
     if isinstance(value, str):
         cleaned = value.strip()
         if not cleaned:
@@ -101,8 +111,26 @@ def _normalize_site(raw_value: Any) -> str | None:
     return text
 
 
+def _as_date(value: Any) -> date | None:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    parsed = _parse_date(value)
+    if parsed is None:
+        return None
+    try:
+        return date.fromisoformat(parsed[:10])
+    except ValueError:
+        return None
+
+
 def _resolve_dataset_path() -> Path | None:
-    configured = os.getenv("SAR_DATASET_PATH") or os.getenv("SAR_DATASET_FILE")
+    configured = (
+        os.getenv("SAR_DATASET_PATH")
+        or os.getenv("SAR_DATASET_FILE")
+        or get_settings().sar_dataset_path
+    )
     if configured:
         candidate = Path(configured).expanduser().resolve()
         if candidate.exists():
@@ -156,13 +184,13 @@ def _convert_sheet_to_records(sheet_name: str, rows: list[tuple[Any, ...]], sour
             continue
         raw = {header[idx]: value for idx, value in enumerate(row) if idx < len(header)}
         cleaned = { _normalize_key(key): _normalize_scalar(value) for key, value in raw.items() }
-        site = _normalize_site(
-            cleaned.get("site")
-            or cleaned.get("study_site")
-            or cleaned.get("location")
-            or cleaned.get("site_name")
-        )
-        year = _as_int(cleaned.get("year") or cleaned.get("calendar_year"))
+        site = _normalize_site(_first_present(
+            cleaned.get("site"),
+            cleaned.get("study_site"),
+            cleaned.get("location"),
+            cleaned.get("site_name"),
+        ))
+        year = _as_int(_first_present(cleaned.get("year"), cleaned.get("calendar_year")))
         if site is None and year is not None:
             continue
 
@@ -173,16 +201,37 @@ def _convert_sheet_to_records(sheet_name: str, rows: list[tuple[Any, ...]], sour
             source_file=source_file,
             source_sheet=sheet_name,
             source_row=row_index,
-            acquisition_time=datetime(year, 1, 1).isoformat() if year is not None else None,
-            satellite=cleaned.get("satellite") or cleaned.get("mission") or cleaned.get("sensor") or cleaned.get("platform"),
-            band=cleaned.get("band") or cleaned.get("frequency_band") or cleaned.get("sensor_band"),
-            polarisation=cleaned.get("polarisation") or cleaned.get("polarization") or cleaned.get("pol"),
-            latitude=_normalize_scalar(cleaned.get("latitude") or cleaned.get("lat")),
-            longitude=_normalize_scalar(cleaned.get("longitude") or cleaned.get("lon") or cleaned.get("lng")),
-            backscatter_db=_normalize_scalar(cleaned.get("backscatter_db") or cleaned.get("sigma_0") or cleaned.get("backscatter")),
-            coherence=_normalize_scalar(cleaned.get("coherence") or cleaned.get("interferometric_coherence")),
-            rainfall=_as_float(cleaned.get("rainfall") or cleaned.get("rainfall_mm") or cleaned.get("rain_mm") or cleaned.get("precipitation_mm")),
-            soil_moisture=_as_float(cleaned.get("soil_moisture") or cleaned.get("soil_moisture_pct")),
+            acquisition_time=_parse_date(_first_present(
+                cleaned.get("acquisition_time"),
+                cleaned.get("acquisition_date"),
+                cleaned.get("pass_date"),
+                cleaned.get("date"),
+                cleaned.get("timestamp"),
+            )),
+            satellite=_first_present(cleaned.get("satellite"), cleaned.get("mission"), cleaned.get("sensor"), cleaned.get("platform")),
+            band=_first_present(cleaned.get("band"), cleaned.get("frequency_band"), cleaned.get("sensor_band")),
+            polarisation=_first_present(cleaned.get("polarisation"), cleaned.get("polarization"), cleaned.get("pol")),
+            latitude=_normalize_scalar(_first_present(cleaned.get("latitude"), cleaned.get("lat"))),
+            longitude=_normalize_scalar(_first_present(cleaned.get("longitude"), cleaned.get("lon"), cleaned.get("lng"))),
+            backscatter_db=_normalize_scalar(_first_present(
+                cleaned.get("backscatter_db"),
+                cleaned.get("sigma_0"),
+                cleaned.get("backscatter"),
+            )),
+            coherence=_normalize_scalar(_first_present(
+                cleaned.get("coherence"),
+                cleaned.get("interferometric_coherence"),
+            )),
+            rainfall=_as_float(_first_present(
+                cleaned.get("rainfall"),
+                cleaned.get("rainfall_mm"),
+                cleaned.get("rain_mm"),
+                cleaned.get("precipitation_mm"),
+            )),
+            soil_moisture=_as_float(_first_present(
+                cleaned.get("soil_moisture"),
+                cleaned.get("soil_moisture_pct"),
+            )),
             metadata={
                 key: value
                 for key, value in cleaned.items()
@@ -294,8 +343,8 @@ def filter_records(
     year: int | None = None,
     year_from: int | None = None,
     year_to: int | None = None,
-    date_from: str | None = None,
-    date_to: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     satellite: str | None = None,
     band: str | None = None,
     polarisation: str | None = None,
@@ -306,10 +355,13 @@ def filter_records(
             continue
         if year is not None and record.year != year:
             continue
-        if year_from is not None and record.year is not None and record.year < year_from:
-            continue
-        if year_to is not None and record.year is not None and record.year > year_to:
-            continue
+        if year_from is not None or year_to is not None:
+            if record.year is None:
+                continue
+            if year_from is not None and record.year < year_from:
+                continue
+            if year_to is not None and record.year > year_to:
+                continue
         if satellite and (record.satellite or "").lower() != satellite.lower():
             continue
         if band and (record.band or "").upper() != band.upper():
@@ -317,16 +369,14 @@ def filter_records(
         if polarisation and (record.polarisation or "").upper() != polarisation.upper():
             continue
 
-        candidate_date = record.acquisition_time
-        if isinstance(candidate_date, datetime):
-            date_value = candidate_date.isoformat()
-        else:
-            date_value = str(candidate_date) if candidate_date else None
-
-        if date_from and date_value and date_value < date_from:
-            continue
-        if date_to and date_value and date_value > date_to:
-            continue
+        if date_from is not None or date_to is not None:
+            record_date = _as_date(record.acquisition_time)
+            if record_date is None:
+                continue
+            if date_from is not None and record_date < date_from:
+                continue
+            if date_to is not None and record_date > date_to:
+                continue
         filtered.append(record)
     return filtered
 

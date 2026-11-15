@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
@@ -65,8 +66,8 @@ async def list_observations(
     year: Annotated[int | None, Query(description="Calendar year for the pass record.")] = None,
     year_from: Annotated[int | None, Query(description="Minimum year.")] = None,
     year_to: Annotated[int | None, Query(description="Maximum year.")] = None,
-    date_from: Annotated[str | None, Query(description="Minimum date in ISO format.")] = None,
-    date_to: Annotated[str | None, Query(description="Maximum date in ISO format.")] = None,
+    date_from: Annotated[date | None, Query(description="Minimum acquisition date (inclusive).")] = None,
+    date_to: Annotated[date | None, Query(description="Maximum acquisition date (inclusive).")] = None,
     satellite: Annotated[str | None, Query(description="Mission or platform name.")] = None,
     band: Annotated[str | None, Query(description="Observation band, e.g. L or S.")] = None,
     polarisation: Annotated[str | None, Query(description="Polarization, e.g. HH, VV, HV, VH.")] = None,
